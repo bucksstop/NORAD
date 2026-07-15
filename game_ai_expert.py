@@ -1771,6 +1771,29 @@ class ExpertSovietAI:
         await do_move(u, dests[dest])
         await note("moved")
 
+    def _edge_snipe_cities(self):
+        """Cells of Anchorage and Godthab that are still standing - the two
+        edge cities a raider should bomb before other bombers reach row H."""
+        g = self.g
+        out = set()
+        for cid in g.board.cells:
+            if g.board.is_city(cid) and cid not in g.destroyed:
+                if g.board.city(cid).get("name") in ("Anchorage", "Godthab"):
+                    out.add(cid)
+        return out
+
+    def _bombs_edge_snipe(self, u, snipe):
+        """True if real bomber `u` can reach and bomb Anchorage/Godthab this
+        turn (respecting Assigned Targets)."""
+        g = self.g
+        if u.kind != "bomber" or not snipe:
+            return False
+        for d in g.legal_russian_dests(u):
+            if d in snipe and (not g.opt["targets"]
+                               or getattr(u, "target", None) in (None, d)):
+                return True
+        return False
+
     async def _move_units(self, do_move, ask_fire, note):
         g = self.g
         missiles = self.d.missile_cities()
@@ -1784,7 +1807,13 @@ class ExpertSovietAI:
                   if x.alive and x.entered and not x.frozen
                   and x.moved_turn != g.turn]
         self.rng.shuffle(movers)
-        movers.sort(key=lambda x: x.kind == "bomber")   # decoys bait first
+        # Bomb Anchorage/Godthab FIRST: those edge raids must land before any
+        # OTHER bomber advances to row H (where a decoy can be told apart from a
+        # real), so the defender can't read the wave from the move order.
+        # Otherwise keep the decoys-bait-first ordering.
+        snipe = self._edge_snipe_cities()
+        prio = {id(x): self._bombs_edge_snipe(x, snipe) for x in movers}
+        movers.sort(key=lambda x: (not prio[id(x)], x.kind == "bomber"))
         for u in movers:
             if g.winner:
                 return

@@ -226,6 +226,10 @@ class App:
         self.rules_font = pygame.font.SysFont("segoeui,arial", 12)
         self.med = pygame.font.SysFont("segoeui,arial", 18, bold=True)
         self.big = pygame.font.SysFont("segoeui,arial", 28, bold=True)
+        # larger fonts used only on the full-screen rules overlay (readability)
+        self.rules_title = pygame.font.SysFont("segoeui,arial", 23, bold=True)
+        self.rules_hdr = pygame.font.SysFont("segoeui,arial", 18, bold=True)
+        self.rules_body = pygame.font.SysFont("segoeui,arial", 15)
         if not os.path.exists(MAP_FILE):
             fatal(f'Map file not found: "{MAP_FILE}"')
         self.map_img = pygame.image.load(MAP_FILE).convert()
@@ -533,7 +537,7 @@ class App:
 
     # ------------------------------------------------------------- menu
     async def menu(self):
-        modes = [("Two players (hot seat)", "hotseat"),
+        modes = [("Two Player", "hotseat"),
                  ("Solo - you play the American side", "solo_us"),
                  ("Solo - you play the Soviet side", "solo_sov")]
         opts = [("dew", "The DEW Line"),
@@ -542,7 +546,7 @@ class App:
                 ("slbm", "Soviet sub-launched missiles (adds Canadian AD)"),
                 ("canadian", "Canadian Air Defense"),
                 ("balance", "Play Balance (+1 US missile decoy, -1 Soviet decoy)"),
-                ("targets", "Assigned targets")]
+                ("targets", "Assigned targets (AI opponents only)")]
         game_opts = [
             ("classic_move", "Classic movement (click destination - unit jumps)"),
         ]
@@ -550,7 +554,8 @@ class App:
             ("standard", "Standard AI Opponent"),
             ("expert", "Expert AI Opponent"),
         ]
-        mode_i = 0
+        is_web = self.web_window is not None   # hot seat is disabled online
+        mode_i = 1 if is_web else 0
         # All optional rules default ON except Assigned Targets.
         checks = {k: (k != "targets") for k, _ in opts}
         for k, _ in game_opts:
@@ -568,49 +573,27 @@ class App:
             scr.blit(t, (w // 2 - t.get_width() // 2, 40))
             rects = []
             y = 120
+            # --- Game mode ---
             scr.blit(self.font.render("Game mode:", True, GREY),
                      (w // 2 - 260, y - 24))
-            for i, (label, _) in enumerate(modes):
+            for i, (label, key) in enumerate(modes):
+                disabled = is_web and key == "hotseat"
                 r = pygame.Rect(w // 2 - 260, y, 520, 32)
-                pygame.draw.rect(scr, BTN_HOT if i == mode_i else BTN_BG, r,
-                                 border_radius=6)
-                scr.blit(self.font.render(label, True, WHITE),
+                if disabled:
+                    pygame.draw.rect(scr, (30, 30, 34), r, border_radius=6)
+                elif i == mode_i:
+                    pygame.draw.rect(scr, (46, 108, 74), r, border_radius=6)
+                    pygame.draw.rect(scr, OKGREEN, r, 2, border_radius=6)
+                else:
+                    pygame.draw.rect(scr, BTN_BG, r, border_radius=6)
+                lab = label + ("   (not available online)" if disabled else "")
+                scr.blit(self.font.render(lab, True, GREY if disabled else WHITE),
                          (r.x + 12, r.y + 6))
-                rects.append(("mode", i, r))
+                if not disabled:
+                    rects.append(("mode", i, r))
                 y += 40
             y += 14
-            scr.blit(self.font.render(
-                "Optional rules (click to toggle):", True, GREY),
-                (w // 2 - 260, y - 4))
-            y += 20
-            for k, label in opts:
-                r = pygame.Rect(w // 2 - 260, y, 520, 28)
-                on = checks[k] or (k == "canadian" and checks["slbm"])
-                pygame.draw.rect(scr, BTN_BG, r, border_radius=6)
-                box = pygame.Rect(r.x + 8, r.y + 6, 16, 16)
-                pygame.draw.rect(scr, WHITE, box, 2)
-                if on:
-                    pygame.draw.rect(scr, OKGREEN, box.inflate(-6, -6))
-                scr.blit(self.font.render(label, True, WHITE),
-                         (r.x + 34, r.y + 4))
-                rects.append(("opt", k, r))
-                y += 34
-            y += 14
-            scr.blit(self.font.render("Game options:", True, GREY),
-                     (w // 2 - 260, y - 4))
-            y += 20
-            for k, label in game_opts:
-                r = pygame.Rect(w // 2 - 260, y, 520, 28)
-                pygame.draw.rect(scr, BTN_BG, r, border_radius=6)
-                box = pygame.Rect(r.x + 8, r.y + 6, 16, 16)
-                pygame.draw.rect(scr, WHITE, box, 2)
-                if checks[k]:
-                    pygame.draw.rect(scr, OKGREEN, box.inflate(-6, -6))
-                scr.blit(self.font.render(label, True, WHITE),
-                         (r.x + 34, r.y + 4))
-                rects.append(("opt", k, r))
-                y += 34
-            y += 14
+            # --- AI opponent (below game mode, above optional rules) ---
             hotseat = mode_name == "hotseat"
             scr.blit(self.font.render("AI opponent (solo modes only):", True,
                                       GREY), (w // 2 - 260, y - 4))
@@ -628,6 +611,40 @@ class App:
                          (r.x + 34, r.y + 4))
                 if not hotseat:
                     rects.append(("ai_style", k, r))
+                y += 34
+            y += 14
+            # --- Optional rules ---
+            scr.blit(self.font.render(
+                "Optional rules (click to toggle):", True, GREY),
+                (w // 2 - 260, y - 4))
+            y += 20
+            for k, label in opts:
+                r = pygame.Rect(w // 2 - 260, y, 520, 28)
+                on = checks[k] or (k == "canadian" and checks["slbm"])
+                pygame.draw.rect(scr, BTN_BG, r, border_radius=6)
+                box = pygame.Rect(r.x + 8, r.y + 6, 16, 16)
+                pygame.draw.rect(scr, WHITE, box, 2)
+                if on:
+                    pygame.draw.rect(scr, OKGREEN, box.inflate(-6, -6))
+                scr.blit(self.font.render(label, True, WHITE),
+                         (r.x + 34, r.y + 4))
+                rects.append(("opt", k, r))
+                y += 34
+            y += 14
+            # --- Game options ---
+            scr.blit(self.font.render("Game options:", True, GREY),
+                     (w // 2 - 260, y - 4))
+            y += 20
+            for k, label in game_opts:
+                r = pygame.Rect(w // 2 - 260, y, 520, 28)
+                pygame.draw.rect(scr, BTN_BG, r, border_radius=6)
+                box = pygame.Rect(r.x + 8, r.y + 6, 16, 16)
+                pygame.draw.rect(scr, WHITE, box, 2)
+                if checks[k]:
+                    pygame.draw.rect(scr, OKGREEN, box.inflate(-6, -6))
+                scr.blit(self.font.render(label, True, WHITE),
+                         (r.x + 34, r.y + 4))
+                rects.append(("opt", k, r))
                 y += 34
             y += 6
             need_ai_choice = not hotseat and ai_style is None
@@ -874,9 +891,10 @@ class App:
             self.make_view()
         elif (e.type == pygame.KEYDOWN and e.key == pygame.K_r
               and not (e.mod & (pygame.KMOD_CTRL | pygame.KMOD_ALT
-                                | pygame.KMOD_META))):
-            # plain R toggles the rules; let Ctrl/Alt/Meta combos (e.g. the
-            # browser's Ctrl+Shift+R reload) pass through instead of opening it
+                                | pygame.KMOD_META | pygame.KMOD_SHIFT))):
+            # ONLY an unmodified R toggles the rules; any modifier combo (e.g.
+            # the browser's Ctrl+Shift+R hard-reload) passes through instead of
+            # opening the rules overlay
             self.rules_open = not self.rules_open
         elif self.rules_open:
             return   # swallow all other input while the rules screen is up
@@ -2406,14 +2424,15 @@ class App:
         scr.blit(panel, box.topleft)
         pygame.draw.rect(scr, HILITE, box, 2)
 
-        title = self.med.render("NORAD - RULES SUMMARY  (press R to close)",
-                                True, WHITE)
+        title = self.rules_title.render(
+            "NORAD - RULES SUMMARY  (press R to close)", True, WHITE)
         scr.blit(title, (box.centerx - title.get_width() // 2, box.y + 8))
 
-        rf = self.rules_font
+        rf = self.rules_body
+        line_h = rf.get_height() + 2
         footer_lines = self.wrap(RULES_FOOTER, box.w - 40, rf)
-        footer_h = 15 * len(footer_lines) + 10
-        roster_h = 64 if self.game else 0
+        footer_h = line_h * len(footer_lines) + 10
+        roster_h = 92 if self.game else 0
         top_y = box.y + 8 + title.get_height() + 8
         cols_rect = pygame.Rect(box.x + 20, top_y, box.w - 40,
                                 box.bottom - footer_h - roster_h - top_y - 16)
@@ -2426,7 +2445,7 @@ class App:
             for kind, text in col:
                 if kind == "header":
                     cy += 4
-                    surf = self.font.render(text, True, HILITE)
+                    surf = self.rules_hdr.render(text, True, HILITE)
                     scr.blit(surf, (cx, cy))
                     cy += surf.get_height() + 3
                     pygame.draw.line(scr, (90, 90, 90), (cx, cy - 2),
@@ -2453,7 +2472,7 @@ class App:
         for line in footer_lines:
             s = rf.render(line, True, GREY)
             scr.blit(s, (box.centerx - s.get_width() // 2, fy))
-            fy += 15
+            fy += line_h
 
     def _unit_roster_entries(self):
         """(sprite_id, label, count-text) for each visually distinct unit
@@ -2509,8 +2528,8 @@ class App:
         entries = self._unit_roster_entries()
         if not entries:
             return
-        rf = self.rules_font
-        icon_s = 46
+        rf = self.rules_body
+        icon_s = 68
         slot_w = rect.w // len(entries)
         for i, (uid, label, sub) in enumerate(entries):
             cx = rect.x + slot_w * i + slot_w // 2
