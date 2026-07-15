@@ -31,6 +31,16 @@ $files = @{
     "data\grid.json"       = "data\grid.json"
 }
 
+# Free the build/serve port so a previously-started local server doesn't lock
+# the build directory (and so -Serve can reuse the port).
+$listen = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+if ($listen) {
+    $listen | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object {
+        try { Stop-Process -Id $_ -Force -ErrorAction Stop } catch {}
+    }
+    Start-Sleep -Milliseconds 500
+}
+
 Write-Host "Staging web build into $dst ..."
 if (Test-Path $dst) { Remove-Item $dst -Recurse -Force }
 New-Item -ItemType Directory -Force (Join-Path $dst "data") | Out-Null
