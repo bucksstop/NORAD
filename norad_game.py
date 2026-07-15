@@ -22,6 +22,7 @@ Requires: pygame  (pip install pygame)
 Run:      python norad_game.py
 """
 import asyncio
+import inspect
 import json
 import math
 import os
@@ -308,7 +309,7 @@ class App:
             return True
         return False
 
-    def pause(self, ms):
+    async def pause(self, ms):
         end = pygame.time.get_ticks() + ms
         while pygame.time.get_ticks() < end:
             for e in pygame.event.get():
@@ -318,6 +319,7 @@ class App:
                 self.view_event(e)
             self.draw()
             self.clock.tick(60)
+            await asyncio.sleep(0)
 
     def ensure_visible(self, cid):
         """Zoom the map out until the given square is on screen."""
@@ -332,7 +334,7 @@ class App:
             v.zoom_at(self.map_rect.centerx, self.map_rect.centery,
                       1 / 1.3)
 
-    def wait_click(self, text):
+    async def wait_click(self, text):
         """Block until the player clicks (or presses Space/Enter)."""
         self.banner = text
         while True:
@@ -351,6 +353,7 @@ class App:
                     self.banner = None
                     return
             self.clock.tick(60)
+            await asyncio.sleep(0)
 
     def entry_type_label(self):
         if not self.entry_mode:              # nothing chosen yet
@@ -367,7 +370,7 @@ class App:
             base = "Can. " + base
         return base
 
-    def pick_unit(self, cid, stack, title):
+    async def pick_unit(self, cid, stack, title):
         """Popup: choose one unit from a stack. Returns the unit or None."""
         g = self.game
         tile, pad = 64, 14
@@ -432,8 +435,9 @@ class App:
                             return u
                     return None
             self.clock.tick(60)
+            await asyncio.sleep(0)
 
-    def gate(self, kind, msg):
+    async def gate(self, kind, msg):
         """Click-to-continue with a COMBAT/BOMBING/DEW panel title."""
         titles = {"combat": ("COMBAT", (110, 170, 255)),
                   "bomb": ("BOMBING", (235, 90, 90)),
@@ -442,18 +446,18 @@ class App:
                   "illegal": ("ILLEGAL MOVE", (235, 90, 90)),
                   "target": ("ASSIGNED TARGET", TARGET_PURPLE)}
         self.title_override = titles.get(kind, ("BOMBING", (235, 90, 90)))
-        self.wait_click(msg)
+        await self.wait_click(msg)
         self.title_override = None
 
-    def announce_stuck(self):
+    async def announce_stuck(self):
         """Pop up an explanation for any Soviet unit destroyed for having no
         legal move (set by the rules engine at the end of a Soviet turn)."""
         msgs = getattr(self.game, "_stuck_msgs", [])
         if msgs:
             self.game._stuck_msgs = []
-            self.gate("lost", " ".join(msgs))
+            await self.gate("lost", " ".join(msgs))
 
-    def check_dew_break(self):
+    async def check_dew_break(self):
         """Show a one-time click-to-continue popup when the DEW Line falls."""
         g = self.game
         if (g.opt["dew"] and g.dew_break_turn is not None
@@ -463,9 +467,9 @@ class App:
                         if e.startswith("The DEW Line is broken")),
                        "The DEW Line is broken! Soviet staging halts for two "
                        "turns; afterwards units stage on the row-H line.")
-            self.gate("dew", msg)
+            await self.gate("dew", msg)
 
-    def ask_yesno(self, lines):
+    async def ask_yesno(self, lines):
         while True:
             self.draw(modal=lines)
             for e in pygame.event.get():
@@ -484,6 +488,7 @@ class App:
                     if no.collidepoint(e.pos):
                         return False
             self.clock.tick(60)
+            await asyncio.sleep(0)
 
     def _modal_rects(self, lines):
         w, h = self.screen.get_size()
@@ -495,7 +500,7 @@ class App:
         return yes, no
 
     # ------------------------------------------------------------- menu
-    def menu(self):
+    async def menu(self):
         modes = [("Two players (hot seat)", "hotseat"),
                  ("Solo - you play the American side", "solo_us"),
                  ("Solo - you play the Soviet side", "solo_sov")]
@@ -631,10 +636,11 @@ class App:
                                                 and ai_style == "expert")
                         return mode_name, checks
             self.clock.tick(60)
+            await asyncio.sleep(0)
 
     # ------------------------------------------------------------- game
-    def start(self):
-        mode, checks = self.menu()
+    async def start(self):
+        mode, checks = await self.menu()
         self.mode = mode
         self.classic_move = checks.pop("classic_move", False)
         expert_us = checks.pop("expert_us", False)
@@ -654,20 +660,36 @@ class App:
         v.ox, v.oy = float(self.map_rect.x), float(self.map_rect.y)
         v.clamp()
         self.flash("Game started. " + self.phase_hint())
-        self.loop()
+        await self.loop()
 
-    def ask_fire_cb(self):
-        if self.human_us:
-            def cb(m, u):
-                city = self.game.board.city(m.cell)
+    async def _fire_cb(self, cids):
+        """Resolve the American 'fire your missile?' decision for any US
+        missiles sitting on `cids`, returning a plain (non-blocking) callback
+        for the rules engine. When the American side is AI the engine uses the
+        AI's own decision; when it is human we ask now - awaiting the modal -
+        and hand back the cached answers, so the synchronous rules step itself
+        never has to block for input (which a browser cannot do)."""
+        if not self.human_us:
+            return self.us_ai.ask_fire
+        g = self.game
+        answers = {}
+        for cid in cids:
+            for m in [x for x in g.at(cid, "us") if x.kind == "missile"]:
+                city = g.board.city(m.cell)
                 name = city["name"] if city else m.cell
-                return self.ask_yesno(
+                answers[m.id] = await self.ask_yesno(
                     ["AMERICAN PLAYER:",
                      f"A Soviet unit has entered {name} ({m.cell}),",
                      "which is defended by your missile.",
                      "Fire the missile? (Both units are removed.)"])
-            return cb
-        return self.us_ai.ask_fire
+        return lambda m, _u: answers.get(m.id, False)
+
+    def _passive_fire(self, m, u):
+        """Non-blocking ask_fire passed to the AI's take_turn. The UI always
+        supplies a mover, so the engine resolves any human fire prompt through
+        the mover (_fire_cb) and never calls this; it exists only so the AI's
+        headless fallback path has something synchronous to call."""
+        return False
 
     def phase_hint(self):
         g = self.game
@@ -682,7 +704,7 @@ class App:
             "over": "Game over.",
         }.get(g.phase, "")
 
-    def loop(self):
+    async def loop(self):
         while True:
             g = self.game
             if (g.phase == "bomber_targets" and self.human_sov
@@ -690,17 +712,17 @@ class App:
                 g.next_phase()      # human assigns targets while staging, later
                 continue
             if g.phase != "over" and not self.human_turn():
-                self.run_ai_phase()
+                await self.run_ai_phase()
                 continue
             for e in pygame.event.get():
-                self.handle(e)
+                await self.handle(e)
             self.draw()
             self.clock.tick(60)
+            await asyncio.sleep(0)
 
     # ------------------------------------------------------------- AI
-    def animate_soviet_move(self, u, path):
+    async def animate_soviet_move(self, u, path):
         g = self.game
-        ask = self.ask_fire_cb()
         if not u.entering and not g.begin_russian_move(u):
             return "arrived"
         self.ensure_visible(u.cell)
@@ -708,23 +730,24 @@ class App:
             self.ensure_visible(path[-1])
         for cid in path:
             self.ensure_visible(cid)
+            ask = await self._fire_cb([cid])
             res = g.russian_step(u, cid, ask)
             self.draw()
-            self.pause(AI_STEP_MS)
+            await self.pause(AI_STEP_MS)
             if res == "dead":
                 # A DEW-exposed decoy stays on the board (blank back showing)
                 # through the gate, then is removed when the player continues.
-                self.gate("combat", g.log[-1])
+                await self.gate("combat", g.log[-1])
                 if getattr(u, "dew_exposed", False):
                     u.alive = False
                 return "dead"
         g.end_russian_move(u)
         if not u.alive:                 # decoy dashed onto a held-fire missile
-            self.gate("combat", g.log[-1])
+            await self.gate("combat", g.log[-1])
             return "dead"
         return "arrived"
 
-    def animate_fighter_move(self, u, path):
+    async def animate_fighter_move(self, u, path):
         g = self.game
         if not g.begin_fighter_move(u):
             return "arrived"
@@ -735,14 +758,14 @@ class App:
             self.ensure_visible(cid)
             g.fighter_step(u, cid)
             self.draw()
-            self.pause(AI_STEP_MS)
+            await self.pause(AI_STEP_MS)
         g.end_fighter_move(u)
         return "arrived"
 
-    def run_ai_phase(self):
+    async def run_ai_phase(self):
         g = self.game
         self.draw()
-        self.pause(350)
+        await self.pause(350)
         if g.phase in ("cuban_setup", "slbm_targets", "bomber_targets"):
             self.rus_ai.do_setup_phase()
             self.flash(self.phase_hint())
@@ -751,33 +774,35 @@ class App:
             self.flash("The American AI has placed its units. "
                        + self.phase_hint())
         elif g.phase == "russian":
-            def rus_event(kind=""):
+            async def rus_event(kind=""):
                 if kind == "bombed":
-                    self.gate("bomb", g.log[-1])
-                    self.check_dew_break()
+                    await self.gate("bomb", g.log[-1])
+                    await self.check_dew_break()
                 else:
-                    self.pause(200)
-            self.rus_ai.take_turn(self.ask_fire_cb(),
-                                  mover=self.animate_soviet_move,
-                                  on_event=rus_event)
-            self.announce_stuck()
+                    await self.pause(200)
+            await self.rus_ai.take_turn(self._passive_fire,
+                                        mover=self.animate_soviet_move,
+                                        on_event=rus_event)
+            await self.announce_stuck()
             self.flash(self.phase_hint())
         elif g.phase == "american":
-            self.us_ai.take_turn(mover=self.animate_fighter_move,
-                                 on_event=lambda *_: self.pause(150))
+            async def us_event(*_):
+                await self.pause(150)
+            await self.us_ai.take_turn(mover=self.animate_fighter_move,
+                                       on_event=us_event)
             has_combat = any(t for _sq, _fs, t
                              in g.fighter_combat_preview())
-            self.wait_click("American movement complete. Click to resolve "
-                            "combat." if has_combat
-                            else "American movement complete.")
-            self.resolve_american_combat()
+            await self.wait_click("American movement complete. Click to resolve "
+                                  "combat." if has_combat
+                                  else "American movement complete.")
+            await self.resolve_american_combat()
             self.flash(self.phase_hint())
         self.trace = None
         self.sel_unit = None
         self.sel_dests = {}
         self.turn_problems = []
 
-    def resolve_american_combat(self):
+    async def resolve_american_combat(self):
         """Reveal and resolve each battle square in order, slowly."""
         g = self.game
         self.title_override = ("COMBAT", (110, 170, 255))
@@ -795,12 +820,12 @@ class App:
             self.banner = outcome
             self.banner_hint = False
             self.draw()
-            self.pause(1600)
+            await self.pause(1600)
             # 2) keep the SAME outcome text, add "(click to continue)"
             #    beneath it, and leave the units on the map until the player
             #    clicks - the units are removed ON the continue click.
             self.banner_hint = True
-            self.wait_click(outcome)
+            await self.wait_click(outcome)
             g.resolve_square(sq)
         self._combat_focus = None
         self.title_override = None
@@ -808,7 +833,7 @@ class App:
         g.finish_american_turn()
 
     # ------------------------------------------------------------- events
-    def handle(self, e):
+    async def handle(self, e):
         g = self.game
         if e.type == pygame.QUIT:
             pygame.quit()
@@ -880,9 +905,9 @@ class App:
         elif e.type == pygame.MOUSEMOTION and self.panning:
             self.view.pan(*e.rel)
         elif e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
-            self.click(*e.pos)
+            await self.click(*e.pos)
 
-    def click(self, sx, sy):
+    async def click(self, sx, sy):
         self.msg = ""            # a new input replaces the old message
         if self.awaiting_target is not None:
             if sx >= PANEL_W:
@@ -895,7 +920,9 @@ class App:
         for rect, label, cb, enabled, _bg in self.buttons:
             if rect.collidepoint(sx, sy):
                 if enabled:
-                    cb()
+                    r = cb()
+                    if inspect.isawaitable(r):
+                        await r
                 return
         if self.human_sov and self.game.phase in ("russian", "cuban_setup"):
             if self.stage_kind is not None:
@@ -916,7 +943,7 @@ class App:
             return
         mx, my = self.view.to_map(sx, sy)
         cid = self.cell_at(mx, my)
-        self.map_click(cid)
+        await self.map_click(cid)
 
     def cell_at(self, mx, my):
         for cid, cell in self.game.board.cells.items():
@@ -981,7 +1008,7 @@ class App:
                                    "stack (it stays selected).")
                     return
 
-    def map_click(self, cid):
+    async def map_click(self, cid):
         if self.awaiting_target is not None:
             self.click_pick_target(cid)
             return
@@ -994,9 +1021,9 @@ class App:
         elif g.phase in ("slbm_targets", "bomber_targets") and self.human_sov:
             self.click_assign(cid)
         elif g.phase == "russian" and self.human_sov:
-            self.click_russian(cid)
+            await self.click_russian(cid)
         elif g.phase == "american" and self.human_us:
-            self.click_american(cid)
+            await self.click_american(cid)
 
     def click_us_setup(self, cid):
         g = self.game
@@ -1037,7 +1064,7 @@ class App:
                 self.flash(self.phase_hint())
 
     # ---------------- Soviet turn clicks
-    def click_russian(self, cid):
+    async def click_russian(self, cid):
         g = self.game
         # Clicking a sub-launched missile placed this turn removes it so it can
         # be set down elsewhere - but ONLY during the staging step. Once staging
@@ -1074,11 +1101,11 @@ class App:
             self.do_entry_click(cid)
             return
         if self.trace:
-            self.trace_click_soviet(cid)
+            await self.trace_click_soviet(cid)
             return
         if (self.classic_move and self.sel_unit
                 and cid in self._blocked_dests):
-            self.gate("target", self._target_block_msg(self.sel_unit))
+            await self.gate("target", self._target_block_msg(self.sel_unit))
             return
         if self.classic_move and self.sel_unit and cid in self.sel_dests:
             u = self.sel_unit
@@ -1086,24 +1113,25 @@ class App:
             self.sel_unit = None
             self.sel_dests = {}
             if u.entering:
-                ask = self.ask_fire_cb()
                 for step in path:
+                    ask = await self._fire_cb([step])
                     if g.russian_step(u, step, ask) == "dead":
                         self.flash(g.log[-1], ERRRED)
-                        self.gate("combat", g.log[-1])
+                        await self.gate("combat", g.log[-1])
                         return
                 g.end_russian_move(u)
-                self.maybe_bomb(u)
+                await self.maybe_bomb(u)
                 return
-            res = g.move_russian(u, path, self.ask_fire_cb())
+            ask = await self._fire_cb(path)
+            res = g.move_russian(u, path, ask)
             if res == "dead":
                 self.flash(g.log[-1], ERRRED)
-                self.gate("combat", g.log[-1])
+                await self.gate("combat", g.log[-1])
             elif not u.alive:           # decoy dashed onto a held-fire missile
-                self.gate("combat", g.log[-1])
+                await self.gate("combat", g.log[-1])
             else:
-                self.maybe_bomb(u)
-                self.enforce_lateral(u)
+                await self.maybe_bomb(u)
+                await self.enforce_lateral(u)
             return
         stack = [u for u in g.at(cid, "soviet")]
         if not stack:
@@ -1111,7 +1139,7 @@ class App:
             self.sel_dests = {}
             return
         if len(stack) > 1:
-            u = self.pick_unit(cid, stack, f"Select a unit at {cid}")
+            u = await self.pick_unit(cid, stack, f"Select a unit at {cid}")
             if u is None:
                 return
         else:
@@ -1136,8 +1164,9 @@ class App:
             q = ("Abort its entry and return to starting location?"
                  if entry
                  else "Abort that move and start it again?")
-            if self.ask_yesno(["SOVIET PLAYER:",
-                               "This unit has already moved this turn.", q]):
+            if await self.ask_yesno(["SOVIET PLAYER:",
+                                     "This unit has already moved this turn.",
+                                     q]):
                 g.abort_russian_move(u)
                 if u.cell is None:
                     self.flash("Unit returned to its staging slot.")
@@ -1176,7 +1205,7 @@ class App:
             self.flash("Trace the path square by square. Click the unit "
                        "to stop; Esc aborts.")
 
-    def trace_click_soviet(self, cid):
+    async def trace_click_soviet(self, cid):
         g = self.game
         u = self.trace
         if cid == u.cell:
@@ -1191,21 +1220,22 @@ class App:
                 return
             self.trace = None
             if not u.alive:              # decoy dashed onto a held-fire missile
-                self.gate("combat", g.log[-1])
+                await self.gate("combat", g.log[-1])
                 return
-            self.maybe_bomb(u)
-            self.enforce_lateral(u)
+            await self.maybe_bomb(u)
+            await self.enforce_lateral(u)
             return
         opts = g.russian_step_options(u)
         if cid in opts:
             if self._target_step_block(u, cid, opts):
-                self.gate("target", self._target_block_msg(u))
+                await self.gate("target", self._target_block_msg(u))
                 return
-            res = g.russian_step(u, cid, self.ask_fire_cb())
+            ask = await self._fire_cb([cid])
+            res = g.russian_step(u, cid, ask)
             if res == "dead":
                 self.trace = None
                 self.flash(g.log[-1], ERRRED)
-                self.gate("combat", g.log[-1])
+                await self.gate("combat", g.log[-1])
             elif not g.russian_step_options(u):
                 self.flash("No movement left - click the unit to stop "
                            "(or Esc to abort).", HILITE)
@@ -1213,7 +1243,7 @@ class App:
             self.flash("Click an adjacent square (or the unit to stop).",
                        ERRRED)
 
-    def enforce_lateral(self, u):
+    async def enforce_lateral(self, u):
         """Undo an ILLEGAL >2 east/west move. A real bomber may exceed the
         lateral limit only if it bombs a city that turn; a decoy only if it
         ends on a missile-defended city (that legal decoy dash is already
@@ -1239,27 +1269,27 @@ class App:
         self.trace = None
         self.sel_unit = None
         self.sel_dests = {}
-        self.gate("illegal", why + " This move is illegal - the unit has been "
-                  "returned to where it started the turn.")
+        await self.gate("illegal", why + " This move is illegal - the unit has "
+                        "been returned to where it started the turn.")
         return True
 
-    def maybe_bomb(self, u):
+    async def maybe_bomb(self, u):
         g = self.game
         if g.can_bomb(u):
             city = g.board.city(u.cell)
             if self.human_sov:
-                if self.ask_yesno(
+                if await self.ask_yesno(
                         ["SOVIET PLAYER:",
                          f"Your unit has stopped at {city['name']} "
                          f"({city['points']} points).",
                          "Bomb the city?"]):
                     g.bomb(u)
-                    self.gate("bomb", g.log[-1])
-                    self.check_dew_break()
+                    await self.gate("bomb", g.log[-1])
+                    await self.check_dew_break()
             else:
                 g.bomb(u)
-                self.gate("bomb", g.log[-1])
-                self.check_dew_break()
+                await self.gate("bomb", g.log[-1])
+                await self.check_dew_break()
 
     def staged_click(self, u):
         g = self.game
@@ -1443,7 +1473,7 @@ class App:
                    "Purple marks its target.")
 
     # ---------------- American turn clicks
-    def click_american(self, cid):
+    async def click_american(self, cid):
         g = self.game
         if self.trace:
             self.trace_click_fighter(cid)
@@ -1462,16 +1492,17 @@ class App:
                       and u.move_start is not None]
         movable = [u for u in here if u in g.movable_fighters()]
         if len(here) > 1 and (movable or moved_here):
-            u = self.pick_unit(cid, here, f"Select a unit at {cid}")
+            u = await self.pick_unit(cid, here, f"Select a unit at {cid}")
             if u is None:
                 return
             if u in movable:
                 self.select_fighter(u)
             elif u in moved_here:
-                if self.ask_yesno(["AMERICAN PLAYER:",
-                                   "This fighter has already moved this "
-                                   "turn.",
-                                   "Abort that move and start it again?"]):
+                if await self.ask_yesno(["AMERICAN PLAYER:",
+                                         "This fighter has already moved this "
+                                         "turn.",
+                                         "Abort that move and start it "
+                                         "again?"]):
                     g.abort_fighter_move(u)
                     self.select_fighter(u)
             else:
@@ -1482,9 +1513,10 @@ class App:
             self.select_fighter(movable[-1])
         elif moved_here:
             u = moved_here[-1]
-            if self.ask_yesno(["AMERICAN PLAYER:",
-                               "This fighter has already moved this turn.",
-                               "Abort that move and start it again?"]):
+            if await self.ask_yesno(["AMERICAN PLAYER:",
+                                     "This fighter has already moved this "
+                                     "turn.",
+                                     "Abort that move and start it again?"]):
                 g.abort_fighter_move(u)
                 self.select_fighter(u)
         else:
@@ -1622,7 +1654,7 @@ class App:
         self.game.finish_us_setup()
         self.flash(self.phase_hint())
 
-    def end_russian(self):
+    async def end_russian(self):
         if self.trace:
             self.flash("Finish or abort the current move first.", ERRRED)
             return
@@ -1631,7 +1663,7 @@ class App:
             n = len(unmoved)
             noun = ("A sub-launched missile has" if n == 1
                     else f"{n} sub-launched missiles have")
-            if not self.ask_yesno(
+            if not await self.ask_yesno(
                     ["SOVIET PLAYER:",
                      f"{noun} not moved this turn.",
                      "Any missile left unmoved will be removed from the map.",
@@ -1648,16 +1680,16 @@ class App:
             self.sel_unit = None
             self.sel_dests = {}
             self.entry_group = None
-            self.announce_stuck()
+            await self.announce_stuck()
             self.flash(self.phase_hint())
 
-    def end_american(self):
+    async def end_american(self):
         if self.trace:
             self.flash("Finish or abort the current move first.", ERRRED)
             return
         self.sel_unit = None
         self.sel_dests = {}
-        self.resolve_american_combat()
+        await self.resolve_american_combat()
         self.flash(self.phase_hint())
 
     def toggle_reveal(self):
@@ -2482,10 +2514,9 @@ class App:
 
 async def main():
     # pygbag (the web/WebAssembly build) runs this coroutine as the program's
-    # entry point. On the desktop it is driven by asyncio.run() below. For now
-    # start() is still synchronous; Steps 3-5 make the game loop truly async so
-    # the browser build can yield a frame at a time.
-    App().start()
+    # entry point. On the desktop it is driven by asyncio.run() below. The whole
+    # game loop is async so the browser build can yield a frame at a time.
+    await App().start()
 
 
 if __name__ == "__main__":

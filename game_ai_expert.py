@@ -73,6 +73,12 @@ _BOMBER_KINDS = ("bomber", "decoy_bomber")
 _SLBM_KINDS = ("missile", "decoy_missile")
 
 
+async def _anoop(*_):
+    """Awaitable no-op: the default on_event when the UI supplies none (headless
+    AI-vs-AI). take_turn awaits on_event, so the fallback must be awaitable."""
+    return None
+
+
 def _sigmoid(x):
     if x <= -60.0:
         return 0.0
@@ -885,9 +891,9 @@ class ExpertAmericanAI:
         return self.rng.random() < _sigmoid(score / self.FIRE_TEMP)
 
     # ---- fighter movement (value-gated, probabilistic interception) -------
-    def take_turn(self, mover=None, on_event=None):
+    async def take_turn(self, mover=None, on_event=None):
         g = self.g
-        note = on_event or (lambda *_: None)
+        note = on_event or _anoop
         self.b.update()
         tm = ThreatModel(g, self.b)
         if tm.provably_won():
@@ -934,11 +940,11 @@ class ExpertAmericanAI:
                 continue
             path = g.fighter_path(f, u.cell)
             if mover:
-                mover(f, path)
+                await mover(f, path)
             else:
                 g.move_fighter(f, u.cell)
             used.add(f.id)
-            note("intercept")
+            await note("intercept")
 
     def _value_at_risk(self, u, tm):
         """Points at stake if `u` is a real attacker: the most valuable city it
@@ -1518,7 +1524,7 @@ class ExpertSovietAI:
             g.auto_assign_targets()
 
     # ---------------- staging
-    def _stage_wave(self, note):
+    async def _stage_wave(self, note):
         g = self.g
         pool = g.offboard_bombers()
         if pool and not g.staging_blocked():
@@ -1549,10 +1555,10 @@ class ExpertSovietAI:
                 start = min(items, key=lambda kv: dm.get(kv[0], 99))
                 ok, _ = g.stage_unit(u, start[0], start[1])
                 if ok:
-                    note("staged")
+                    await note("staged")
         g.finish_staging(force=True)
 
-    def _launch_staged(self, mover, ask_fire, note):
+    async def _launch_staged(self, mover, ask_fire, note):
         g = self.g
         for u in list(g.staged_units()):
             if u.stage_group == "cuban":
@@ -1571,21 +1577,21 @@ class ExpertSovietAI:
             best = min(items, key=lambda d0: (dm.get(d0, 99),
                                               -g.board.row_i[d0]))
             if mover:
-                mover(u, dests[best])
+                await mover(u, dests[best])
             else:
                 for cid in dests[best]:
                     if g.russian_step(u, cid, ask_fire) == "dead":
                         break
                 else:
                     g.end_russian_move(u)
-            note("entered")
+            await note("entered")
             # a Siberian entry can end ON Anchorage - snipe it
             if u.alive and u.cell and g.can_bomb(u):
                 g.bomb(u)
-                note("bombed")
+                await note("bombed")
 
     # ---------------- SLBMs
-    def _place_slbm(self, note):
+    async def _place_slbm(self, note):
         g = self.g
         if not g.opt["slbm"] or g.turn < 2:
             return
@@ -1604,7 +1610,7 @@ class ExpertSovietAI:
                       if tgt in g.board.nbrs[c]]
             if beside:
                 g.enter_unit(u, self.rng.choice(beside), "slbm")
-                note("slbm placed")
+                await note("slbm placed")
             return
         cells = list(g.entry_cells("slbm"))
         self.rng.shuffle(cells)
@@ -1629,9 +1635,9 @@ class ExpertSovietAI:
                     best = (v, cid)
         if best:
             g.enter_unit(u, best[1], "slbm")
-            note("slbm placed")
+            await note("slbm placed")
 
-    def _move_slbm(self, u, do_move, note):
+    async def _move_slbm(self, u, do_move, note):
         g = self.g
         dests = g.legal_russian_dests(u)
         if not dests:
@@ -1642,11 +1648,11 @@ class ExpertSovietAI:
             # retires it on its attack turn).
             tgt = getattr(u, "target", None)
             if tgt and tgt in dests:
-                res = do_move(u, dests[tgt])
-                note("moved")
+                res = await do_move(u, dests[tgt])
+                await note("moved")
                 if res != "dead" and g.can_bomb(u):
                     g.bomb(u)
-                    note("bombed")
+                    await note("bombed")
             return
         missiles = self.d.missile_cities()
         cities = [d for d in dests
@@ -1662,11 +1668,11 @@ class ExpertSovietAI:
             baited = [c for c in cities if c in missiles]
             dest = max(baited or cities,
                        key=lambda c: g.board.city(c)["points"])
-        res = do_move(u, dests[dest])
-        note("moved")
+        res = await do_move(u, dests[dest])
+        await note("moved")
         if res != "dead" and g.can_bomb(u):
             g.bomb(u)
-            note("bombed")
+            await note("bombed")
 
     # ---------------- endgame targeting (no real fighters left)
     def _assign_endgame(self, missiles):
@@ -1711,7 +1717,7 @@ class ExpertSovietAI:
         return self._goal.get(u.id) != cid
 
     # ---------------- movement
-    def _move_real(self, u, dests, goal, do_move, note):
+    async def _move_real(self, u, dests, goal, do_move, note):
         g = self.g
         missiles = self.d.missile_cities()
         # Cities a real, surfaced SLBM of ours already covers: treat them like
@@ -1740,13 +1746,13 @@ class ExpertSovietAI:
             dest = min(items, key=lambda d0: (dm.get(d0, 99)
                                               + self.RISK_W
                                               * self.d.pressure(d0)))
-        res = do_move(u, dests[dest])
-        note("moved")
+        res = await do_move(u, dests[dest])
+        await note("moved")
         if res != "dead" and g.can_bomb(u) and u.cell not in claimed:
             g.bomb(u)
-            note("bombed")
+            await note("bombed")
 
-    def _move_decoy(self, u, dests, goal, do_move, note):
+    async def _move_decoy(self, u, dests, goal, do_move, note):
         g = self.g
         role = self._role.get(u.id, "flush")
         if role == "bait" and goal in dests:
@@ -1762,10 +1768,10 @@ class ExpertSovietAI:
             self.rng.shuffle(items)
             dest = min(items, key=lambda d0: (dm.get(d0, 99)
                                               - 0.5 * self.d.pressure(d0)))
-        do_move(u, dests[dest])
-        note("moved")
+        await do_move(u, dests[dest])
+        await note("moved")
 
-    def _move_units(self, do_move, ask_fire, note):
+    async def _move_units(self, do_move, ask_fire, note):
         g = self.g
         missiles = self.d.missile_cities()
         # The endgame 5-pt reassignment is inert under Assigned Targets: targets
@@ -1783,18 +1789,18 @@ class ExpertSovietAI:
             if g.winner:
                 return
             if u.kind in ("missile", "decoy_missile"):
-                self._move_slbm(u, do_move, note)
+                await self._move_slbm(u, do_move, note)
                 continue
             dests = g.legal_russian_dests(u)
             if not dests:
                 continue
             goal = self._ensure_goal(u, missiles)
             if u.kind == "bomber":
-                self._move_real(u, dests, goal, do_move, note)
+                await self._move_real(u, dests, goal, do_move, note)
             else:
-                self._move_decoy(u, dests, goal, do_move, note)
+                await self._move_decoy(u, dests, goal, do_move, note)
 
-    def _cleanup_stacks(self, do_move, note):
+    async def _cleanup_stacks(self, do_move, note):
         g = self.g
         for _pass in range(4):
             occ = {}
@@ -1814,14 +1820,14 @@ class ExpertSovietAI:
                                         for z in g.at(d, "soviet"))]
                     if empty:
                         d = max(empty, key=lambda d0: g.board.row_i[d0])
-                        do_move(x, dests[d])
-                        note("moved")
+                        await do_move(x, dests[d])
+                        await note("moved")
                         if (g.can_bomb(x) and x.kind == "bomber"
                                 and x.cell in self._slbm_claimed_cities()):
                             pass                 # leave an SLBM-covered city be
                         elif g.can_bomb(x):
                             g.bomb(x)
-                            note("bombed")
+                            await note("bombed")
                         moved_any = True
                         if g.winner:
                             return
@@ -1830,21 +1836,25 @@ class ExpertSovietAI:
                 break
 
     # ---------------- turn
-    def take_turn(self, ask_fire, mover=None, on_event=None):
+    async def take_turn(self, ask_fire, mover=None, on_event=None):
         g = self.g
-        note = on_event or (lambda *_: None)
-        do_move = mover or (lambda u, pa: g.move_russian(u, pa, ask_fire))
-        self._stage_wave(note)
-        self._launch_staged(mover, ask_fire, note)
+        note = on_event or _anoop
+        if mover is None:
+            async def do_move(u, pa):
+                return g.move_russian(u, pa, ask_fire)
+        else:
+            do_move = mover
+        await self._stage_wave(note)
+        await self._launch_staged(mover, ask_fire, note)
         for u in [x for x in g.staged_units() if x.stage_group == "cuban"]:
             ok, _ = g.cuban_launch(u)
             if ok:
-                note("cuban entry")
-        self._place_slbm(note)
-        self._move_units(do_move, ask_fire, note)
+                await note("cuban entry")
+        await self._place_slbm(note)
+        await self._move_units(do_move, ask_fire, note)
         if g.winner:
             return
-        self._cleanup_stacks(do_move, note)
+        await self._cleanup_stacks(do_move, note)
         if g.winner:
             return
         g.end_russian_turn(force=True)

@@ -55,6 +55,13 @@ US_STYLES = {
 }
 
 
+async def _anoop(*_):
+    """Awaitable no-op: the default on_event when no UI callback is supplied
+    (e.g. headless AI-vs-AI). take_turn awaits on_event, so the fallback has to
+    be awaitable too."""
+    return None
+
+
 def bfs_dist(board, start):
     dist = {start: 0}
     frontier = [start]
@@ -191,13 +198,17 @@ class RussianAI:
         return (dmap.get(cid, 999), -self.g.board.row_i[cid])
 
     # ---------------- turn
-    def take_turn(self, ask_fire, mover=None, on_event=None):
+    async def take_turn(self, ask_fire, mover=None, on_event=None):
         if self.expert:
-            return self.expert.take_turn(ask_fire, mover=mover,
-                                         on_event=on_event)
+            return await self.expert.take_turn(ask_fire, mover=mover,
+                                               on_event=on_event)
         g, p = self.g, self.p
-        note = on_event or (lambda *_: None)
-        do_move = mover or (lambda u, pa: g.move_russian(u, pa, ask_fire))
+        note = on_event or _anoop
+        if mover is None:
+            async def do_move(u, pa):
+                return g.move_russian(u, pa, ask_fire)
+        else:
+            do_move = mover
         usage = {}
 
         # 1a. stage the wave on the red start line (visible buildup)
@@ -220,7 +231,7 @@ class RussianAI:
                         key=lambda c: self._entry_key(c, dmap, goal))
             ok, _ = g.stage_unit(u, start, starts[start])
             if ok:
-                note("staged")
+                await note("staged")
         g.finish_staging(force=True)
 
         # 1b. fly each staged unit onto the board, one at a time
@@ -242,19 +253,19 @@ class RussianAI:
             best = min(dests, key=lambda d: (dmap.get(d, 999),
                                              -g.board.row_i[d]))
             if mover:
-                mover(u, dests[best])
+                await mover(u, dests[best])
             else:
                 for cid in dests[best]:
                     if g.russian_step(u, cid, ask_fire) == "dead":
                         break
                 else:
                     g.end_russian_move(u)
-            note("entered")
+            await note("entered")
 
         for u in [x for x in g.staged_units() if x.stage_group == "cuban"]:
             ok, _ = g.cuban_launch(u)
             if ok:
-                note("cuban entry")
+                await note("cuban entry")
 
         if g.opt["slbm"] and g.turn >= 2:
             waiting = g.offboard_slbms()
@@ -275,7 +286,7 @@ class RussianAI:
                                 best = (v, cid)
                 if best:
                     g.enter_unit(u, best[1], "slbm")
-                    note("slbm placed")
+                    await note("slbm placed")
 
         movers = [x for x in g.soviet_units()
                   if x.alive and x.entered and not x.frozen
@@ -310,11 +321,11 @@ class RussianAI:
                 else:
                     best = min(dests,
                                key=lambda d: self._dest_score(u, d, goal))
-            res = do_move(u, dests[best])
-            note("moved")
+            res = await do_move(u, dests[best])
+            await note("moved")
             if res != "dead" and g.can_bomb(u):   # bomb whenever we can
                 g.bomb(u)
-                note("bombed")
+                await note("bombed")
             if g.winner:
                 return
         # Resolve any transient stacks the wave created: slide a still-movable
@@ -336,11 +347,11 @@ class RussianAI:
                              if not any(z is not x for z in g.at(d, "soviet"))]
                     if empty:
                         d = max(empty, key=lambda d: g.board.row_i[d])
-                        do_move(x, dests[d])
-                        note("moved")
+                        await do_move(x, dests[d])
+                        await note("moved")
                         if g.can_bomb(x):    # a >2 E/W move must end in a bomb
                             g.bomb(x)
-                            note("bombed")
+                            await note("bombed")
                         moved_any = True
                         if g.winner:
                             return
@@ -466,7 +477,7 @@ class AmericanAI:
         prob = min(1.0, base + 0.125 * self._detected_decoys())
         return g.rng.random() < prob
 
-    def _take_turn_prob(self, mover, note):
+    async def _take_turn_prob(self, mover, note):
         """Sentinel fighters: each rolls whether to engage a raider that has
         newly closed within six squares (33/66/100% for the 1st/2nd/3rd, plus
         12.5% per detected decoy). A committed fighter flies onto the raider,
@@ -503,20 +514,20 @@ class AmericanAI:
             if s.cell in g.legal_fighter_dests(f):
                 path = g.fighter_path(f, s.cell)
                 if mover:
-                    mover(f, path)
+                    await mover(f, path)
                 else:
                     g.move_fighter(f, s.cell)
                 hit.add(id(s))
-                note("intercept")
+                await note("intercept")
 
-    def take_turn(self, mover=None, on_event=None):
+    async def take_turn(self, mover=None, on_event=None):
         """Fighter moves only; the UI resolves combat afterwards."""
         if self.expert:
-            return self.expert.take_turn(mover=mover, on_event=on_event)
+            return await self.expert.take_turn(mover=mover, on_event=on_event)
         g, p = self.g, self.p
-        note = on_event or (lambda *_: None)
+        note = on_event or _anoop
         if p.get("prob"):
-            return self._take_turn_prob(mover, note)
+            return await self._take_turn_prob(mover, note)
         threats = []
         for s in g.soviet_units():
             if not (s.alive and s.entered and s.cell and not s.frozen):
@@ -553,8 +564,8 @@ class AmericanAI:
                 f = best[1]
                 path = g.fighter_path(f, s.cell)
                 if mover:
-                    mover(f, path)
+                    await mover(f, path)
                 else:
                     g.move_fighter(f, s.cell)
                 used.add(f.id)
-                note("intercept")
+                await note("intercept")

@@ -17,6 +17,7 @@ Full-ish overnight: python tools/tune_ai.py --iters 8 --pop 16 --seeds 3
 Writes the best vector to tools/expert_params.json.
 """
 import argparse
+import asyncio
 import json
 import os
 import random
@@ -89,9 +90,9 @@ def run_game(params, rs, opts, seed):
         elif ph == "us_setup":
             us.place_all_units()
         elif ph == "russian":
-            r.take_turn(us.ask_fire)
+            asyncio.run(r.take_turn(us.ask_fire))
         elif ph == "american":
-            us.take_turn()
+            asyncio.run(us.take_turn())
             for sq, _fs, _tg in g.fighter_combat_preview():
                 g.resolve_square(sq)
             g.finish_american_turn()
