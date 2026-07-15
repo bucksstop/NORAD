@@ -21,6 +21,7 @@ Controls:
 Requires: pygame  (pip install pygame)
 Run:      python norad_game.py
 """
+import asyncio
 import json
 import math
 import os
@@ -2479,5 +2480,13 @@ class App:
             yy += 24
 
 
-if __name__ == "__main__":
+async def main():
+    # pygbag (the web/WebAssembly build) runs this coroutine as the program's
+    # entry point. On the desktop it is driven by asyncio.run() below. For now
+    # start() is still synchronous; Steps 3-5 make the game loop truly async so
+    # the browser build can yield a frame at a time.
     App().start()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
