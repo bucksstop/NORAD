@@ -1,0 +1,565 @@
+[
+  {
+    "id": "us_missile_1",
+    "file": "us_missile_1.png",
+    "side": "us",
+    "kind": "missile",
+    "real": true,
+    "move": 0,
+    "back": "us_back_real.png"
+  },
+  {
+    "id": "us_missile_2",
+    "file": "us_missile_2.png",
+    "side": "us",
+    "kind": "missile",
+    "real": true,
+    "move": 0,
+    "back": "us_back_real.png"
+  },
+  {
+    "id": "us_missile_3",
+    "file": "us_missile_3.png",
+    "side": "us",
+    "kind": "missile",
+    "real": true,
+    "move": 0,
+    "back": "us_back_real.png"
+  },
+  {
+    "id": "us_missile_4",
+    "file": "us_missile_4.png",
+    "side": "us",
+    "kind": "missile",
+    "real": true,
+    "move": 0,
+    "back": "us_back_real.png"
+  },
+  {
+    "id": "us_missile_5",
+    "file": "us_missile_5.png",
+    "side": "us",
+    "kind": "missile",
+    "real": true,
+    "move": 0,
+    "back": "us_back_real.png"
+  },
+  {
+    "id": "us_missile_decoy",
+    "file": "us_missile_1.png",
+    "side": "us",
+    "kind": "us_decoy_missile",
+    "real": false,
+    "move": 0,
+    "optional": true,
+    "balance": true,
+    "back": "us_back_blank.png"
+  },
+  {
+    "id": "us_fighter_1",
+    "file": "us_fighter_1.png",
+    "side": "us",
+    "kind": "fighter",
+    "real": true,
+    "move": 6,
+    "back": "us_back_real.png"
+  },
+  {
+    "id": "us_fighter_2",
+    "file": "us_fighter_2.png",
+    "side": "us",
+    "kind": "fighter",
+    "real": true,
+    "move": 6,
+    "back": "us_back_real.png"
+  },
+  {
+    "id": "us_fighter_3",
+    "file": "us_fighter_3.png",
+    "side": "us",
+    "kind": "fighter",
+    "real": true,
+    "move": 6,
+    "back": "us_back_real.png"
+  },
+  {
+    "id": "us_fighter_4",
+    "file": "us_fighter_4.png",
+    "side": "us",
+    "kind": "fighter",
+    "real": true,
+    "move": 6,
+    "back": "us_back_real.png"
+  },
+  {
+    "id": "us_fighter_5",
+    "file": "us_fighter_5.png",
+    "side": "us",
+    "kind": "fighter",
+    "real": true,
+    "move": 6,
+    "back": "us_back_real.png"
+  },
+  {
+    "id": "us_fighter_6",
+    "file": "us_fighter_6.png",
+    "side": "us",
+    "kind": "fighter",
+    "real": true,
+    "move": 6,
+    "back": "us_back_real.png"
+  },
+  {
+    "id": "us_fighter_7",
+    "file": "us_fighter_7.png",
+    "side": "us",
+    "kind": "fighter",
+    "real": true,
+    "move": 6,
+    "back": "us_back_real.png"
+  },
+  {
+    "id": "us_fighter_8",
+    "file": "us_fighter_8.png",
+    "side": "us",
+    "kind": "fighter",
+    "real": true,
+    "move": 6,
+    "back": "us_back_real.png"
+  },
+  {
+    "id": "us_fighter_9",
+    "file": "us_fighter_9.png",
+    "side": "us",
+    "kind": "fighter",
+    "real": true,
+    "move": 6,
+    "back": "us_back_real.png"
+  },
+  {
+    "id": "us_fighter_10",
+    "file": "us_fighter_10.png",
+    "side": "us",
+    "kind": "fighter",
+    "real": true,
+    "move": 6,
+    "back": "us_back_real.png"
+  },
+  {
+    "id": "us_fighter_11",
+    "file": "us_fighter_11.png",
+    "side": "us",
+    "kind": "fighter",
+    "real": true,
+    "move": 6,
+    "back": "us_back_real.png"
+  },
+  {
+    "id": "us_fighter_12",
+    "file": "us_fighter_12.png",
+    "side": "us",
+    "kind": "fighter",
+    "real": true,
+    "move": 6,
+    "back": "us_back_real.png"
+  },
+  {
+    "id": "us_decoy_1",
+    "file": "us_decoy_1.png",
+    "side": "us",
+    "kind": "decoy_fighter",
+    "real": false,
+    "move": 6,
+    "back": "us_back_blank.png"
+  },
+  {
+    "id": "us_decoy_2",
+    "file": "us_decoy_2.png",
+    "side": "us",
+    "kind": "decoy_fighter",
+    "real": false,
+    "move": 6,
+    "back": "us_back_blank.png"
+  },
+  {
+    "id": "us_decoy_3",
+    "file": "us_decoy_3.png",
+    "side": "us",
+    "kind": "decoy_fighter",
+    "real": false,
+    "move": 6,
+    "back": "us_back_blank.png"
+  },
+  {
+    "id": "us_decoy_4",
+    "file": "us_decoy_4.png",
+    "side": "us",
+    "kind": "decoy_fighter",
+    "real": false,
+    "move": 6,
+    "back": "us_back_blank.png"
+  },
+  {
+    "id": "ca_fighter_1",
+    "file": "ca_fighter_1.png",
+    "side": "us",
+    "kind": "fighter",
+    "real": true,
+    "move": 6,
+    "canadian": true,
+    "optional": true,
+    "back": "us_back_real.png"
+  },
+  {
+    "id": "ca_fighter_2",
+    "file": "ca_fighter_2.png",
+    "side": "us",
+    "kind": "fighter",
+    "real": true,
+    "move": 6,
+    "canadian": true,
+    "optional": true,
+    "back": "us_back_real.png"
+  },
+  {
+    "id": "ca_fighter_3",
+    "file": "ca_fighter_3.png",
+    "side": "us",
+    "kind": "fighter",
+    "real": true,
+    "move": 6,
+    "canadian": true,
+    "optional": true,
+    "back": "us_back_real.png"
+  },
+  {
+    "id": "ca_decoy_1",
+    "file": "ca_decoy_1.png",
+    "side": "us",
+    "kind": "decoy_fighter",
+    "real": false,
+    "move": 6,
+    "canadian": true,
+    "optional": true,
+    "back": "us_back_blank.png"
+  },
+  {
+    "id": "sov_bomber_1",
+    "file": "sov_bomber_1.png",
+    "side": "soviet",
+    "kind": "bomber",
+    "real": true,
+    "move": 4,
+    "back": "sov_back_real.png"
+  },
+  {
+    "id": "sov_bomber_2",
+    "file": "sov_bomber_2.png",
+    "side": "soviet",
+    "kind": "bomber",
+    "real": true,
+    "move": 4,
+    "back": "sov_back_real.png"
+  },
+  {
+    "id": "sov_bomber_3",
+    "file": "sov_bomber_3.png",
+    "side": "soviet",
+    "kind": "bomber",
+    "real": true,
+    "move": 4,
+    "back": "sov_back_real.png"
+  },
+  {
+    "id": "sov_bomber_4",
+    "file": "sov_bomber_4.png",
+    "side": "soviet",
+    "kind": "bomber",
+    "real": true,
+    "move": 4,
+    "back": "sov_back_real.png"
+  },
+  {
+    "id": "sov_bomber_5",
+    "file": "sov_bomber_5.png",
+    "side": "soviet",
+    "kind": "bomber",
+    "real": true,
+    "move": 4,
+    "back": "sov_back_real.png"
+  },
+  {
+    "id": "sov_bomber_6",
+    "file": "sov_bomber_6.png",
+    "side": "soviet",
+    "kind": "bomber",
+    "real": true,
+    "move": 4,
+    "back": "sov_back_real.png"
+  },
+  {
+    "id": "sov_bomber_7",
+    "file": "sov_bomber_7.png",
+    "side": "soviet",
+    "kind": "bomber",
+    "real": true,
+    "move": 4,
+    "back": "sov_back_real.png"
+  },
+  {
+    "id": "sov_bomber_8",
+    "file": "sov_bomber_8.png",
+    "side": "soviet",
+    "kind": "bomber",
+    "real": true,
+    "move": 4,
+    "back": "sov_back_real.png"
+  },
+  {
+    "id": "sov_bomber_9",
+    "file": "sov_bomber_9.png",
+    "side": "soviet",
+    "kind": "bomber",
+    "real": true,
+    "move": 4,
+    "back": "sov_back_real.png"
+  },
+  {
+    "id": "sov_bomber_10",
+    "file": "sov_bomber_10.png",
+    "side": "soviet",
+    "kind": "bomber",
+    "real": true,
+    "move": 4,
+    "back": "sov_back_real.png"
+  },
+  {
+    "id": "sov_bomber_11",
+    "file": "sov_bomber_11.png",
+    "side": "soviet",
+    "kind": "bomber",
+    "real": true,
+    "move": 4,
+    "back": "sov_back_real.png"
+  },
+  {
+    "id": "sov_bomber_12",
+    "file": "sov_bomber_12.png",
+    "side": "soviet",
+    "kind": "bomber",
+    "real": true,
+    "move": 4,
+    "back": "sov_back_real.png"
+  },
+  {
+    "id": "sov_bomber_13",
+    "file": "sov_bomber_13.png",
+    "side": "soviet",
+    "kind": "bomber",
+    "real": true,
+    "move": 4,
+    "back": "sov_back_real.png"
+  },
+  {
+    "id": "sov_bomber_14",
+    "file": "sov_bomber_14.png",
+    "side": "soviet",
+    "kind": "bomber",
+    "real": true,
+    "move": 4,
+    "back": "sov_back_real.png"
+  },
+  {
+    "id": "sov_bomber_15",
+    "file": "sov_bomber_15.png",
+    "side": "soviet",
+    "kind": "bomber",
+    "real": true,
+    "move": 4,
+    "back": "sov_back_real.png"
+  },
+  {
+    "id": "sov_bomber_16",
+    "file": "sov_bomber_16.png",
+    "side": "soviet",
+    "kind": "bomber",
+    "real": true,
+    "move": 4,
+    "back": "sov_back_real.png"
+  },
+  {
+    "id": "sov_bomber_17",
+    "file": "sov_bomber_17.png",
+    "side": "soviet",
+    "kind": "bomber",
+    "real": true,
+    "move": 4,
+    "back": "sov_back_real.png"
+  },
+  {
+    "id": "sov_bomber_18",
+    "file": "sov_bomber_18.png",
+    "side": "soviet",
+    "kind": "bomber",
+    "real": true,
+    "move": 4,
+    "back": "sov_back_real.png"
+  },
+  {
+    "id": "sov_bomber_19",
+    "file": "sov_bomber_19.png",
+    "side": "soviet",
+    "kind": "bomber",
+    "real": true,
+    "move": 4,
+    "back": "sov_back_real.png"
+  },
+  {
+    "id": "sov_bomber_20",
+    "file": "sov_bomber_20.png",
+    "side": "soviet",
+    "kind": "bomber",
+    "real": true,
+    "move": 4,
+    "back": "sov_back_real.png"
+  },
+  {
+    "id": "sov_bomber_21",
+    "file": "sov_bomber_21.png",
+    "side": "soviet",
+    "kind": "bomber",
+    "real": true,
+    "move": 4,
+    "back": "sov_back_real.png"
+  },
+  {
+    "id": "sov_bomber_22",
+    "file": "sov_bomber_22.png",
+    "side": "soviet",
+    "kind": "bomber",
+    "real": true,
+    "move": 4,
+    "back": "sov_back_real.png"
+  },
+  {
+    "id": "sov_bomber_23",
+    "file": "sov_bomber_23.png",
+    "side": "soviet",
+    "kind": "bomber",
+    "real": true,
+    "move": 4,
+    "back": "sov_back_real.png"
+  },
+  {
+    "id": "sov_decoy_1",
+    "file": "sov_decoy_1.png",
+    "side": "soviet",
+    "kind": "decoy_bomber",
+    "real": false,
+    "move": 4,
+    "back": "sov_back_blank.png"
+  },
+  {
+    "id": "sov_decoy_2",
+    "file": "sov_decoy_2.png",
+    "side": "soviet",
+    "kind": "decoy_bomber",
+    "real": false,
+    "move": 4,
+    "back": "sov_back_blank.png"
+  },
+  {
+    "id": "sov_decoy_3",
+    "file": "sov_decoy_3.png",
+    "side": "soviet",
+    "kind": "decoy_bomber",
+    "real": false,
+    "move": 4,
+    "back": "sov_back_blank.png"
+  },
+  {
+    "id": "sov_decoy_4",
+    "file": "sov_decoy_4.png",
+    "side": "soviet",
+    "kind": "decoy_bomber",
+    "real": false,
+    "move": 4,
+    "back": "sov_back_blank.png"
+  },
+  {
+    "id": "sov_decoy_5",
+    "file": "sov_decoy_5.png",
+    "side": "soviet",
+    "kind": "decoy_bomber",
+    "real": false,
+    "move": 4,
+    "back": "sov_back_blank.png"
+  },
+  {
+    "id": "sov_decoy_6",
+    "file": "sov_decoy_6.png",
+    "side": "soviet",
+    "kind": "decoy_bomber",
+    "real": false,
+    "move": 4,
+    "back": "sov_back_blank.png"
+  },
+  {
+    "id": "sov_decoy_7",
+    "file": "sov_decoy_7.png",
+    "side": "soviet",
+    "kind": "decoy_bomber",
+    "real": false,
+    "move": 4,
+    "back": "sov_back_blank.png"
+  },
+  {
+    "id": "sov_decoy_8",
+    "file": "sov_decoy_8.png",
+    "side": "soviet",
+    "kind": "decoy_bomber",
+    "real": false,
+    "move": 4,
+    "back": "sov_back_blank.png"
+  },
+  {
+    "id": "sov_missile_1",
+    "file": "sov_missile_1.png",
+    "side": "soviet",
+    "kind": "missile",
+    "real": true,
+    "move": 1,
+    "optional": true,
+    "back": "sov_back_real.png"
+  },
+  {
+    "id": "sov_missile_2",
+    "file": "sov_missile_2.png",
+    "side": "soviet",
+    "kind": "missile",
+    "real": true,
+    "move": 1,
+    "optional": true,
+    "back": "sov_back_real.png"
+  },
+  {
+    "id": "sov_missile_3",
+    "file": "sov_missile_3.png",
+    "side": "soviet",
+    "kind": "missile",
+    "real": true,
+    "move": 1,
+    "optional": true,
+    "back": "sov_back_real.png"
+  },
+  {
+    "id": "sov_missile_4",
+    "file": "sov_missile_4.png",
+    "side": "soviet",
+    "kind": "missile",
+    "real": true,
+    "move": 1,
+    "optional": true,
+    "back": "sov_back_blank.png"
+  }
+]
