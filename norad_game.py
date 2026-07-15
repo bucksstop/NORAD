@@ -144,6 +144,22 @@ def fatal(msg):
     sys.exit(1)
 
 
+def _web_window():
+    """The browser window object when running under pygbag/WebAssembly, else
+    None on the desktop. pygbag exposes it as platform.window; some builds use
+    the pyodide-style js.window. Either gives innerWidth/innerHeight so the
+    display can be sized to the real page instead of a small fixed default."""
+    for modname in ("platform", "js"):
+        try:
+            mod = __import__(modname)
+            win = getattr(mod, "window", None)
+            if win is not None and hasattr(win, "innerWidth"):
+                return win
+        except Exception:
+            pass
+    return None
+
+
 class View:
     def __init__(self, map_size, screen_rect):
         self.mw, self.mh = map_size
@@ -184,9 +200,25 @@ class App:
     def __init__(self):
         pygame.init()
         pygame.display.set_caption("NORAD - Strategic Game of Air Warfare")
-        info = pygame.display.Info()
-        size = (max(800, min(1500, info.current_w - 60)),
-                max(600, min(950, info.current_h - 90)))
+        # In the browser (pygbag) the SDL "desktop" size is a small fixed
+        # default, which leaves the map cramped and the page half empty. When
+        # a browser window is present, size the display to it (and track it so
+        # loop() can follow live resizes); otherwise use the desktop sizing.
+        self.web_window = _web_window()
+        if self.web_window is not None:
+            # Our custom pygbag template sizes the framebuffer to the browser
+            # window (config.fb_width/height) so the game fills the page at the
+            # window's own aspect - no letterbox margins, no distortion. Lay the
+            # game out at exactly that framebuffer size.
+            try:
+                cfg = self.web_window.config
+                size = (max(640, int(cfg.fb_width)), max(480, int(cfg.fb_height)))
+            except Exception:
+                size = (1280, 720)
+        else:
+            info = pygame.display.Info()
+            size = (max(800, min(1500, info.current_w - 60)),
+                    max(600, min(950, info.current_h - 90)))
         self.screen = pygame.display.set_mode(size, pygame.RESIZABLE)
         self.clock = pygame.time.Clock()
         self.font = pygame.font.SysFont("segoeui,arial", 15)
@@ -840,7 +872,11 @@ class App:
             sys.exit()
         elif e.type == pygame.VIDEORESIZE:
             self.make_view()
-        elif e.type == pygame.KEYDOWN and e.key == pygame.K_r:
+        elif (e.type == pygame.KEYDOWN and e.key == pygame.K_r
+              and not (e.mod & (pygame.KMOD_CTRL | pygame.KMOD_ALT
+                                | pygame.KMOD_META))):
+            # plain R toggles the rules; let Ctrl/Alt/Meta combos (e.g. the
+            # browser's Ctrl+Shift+R reload) pass through instead of opening it
             self.rules_open = not self.rules_open
         elif self.rules_open:
             return   # swallow all other input while the rules screen is up
