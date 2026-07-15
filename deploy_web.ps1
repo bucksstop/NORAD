@@ -2,8 +2,8 @@
 deploy_web.ps1 - Publish the web game to GitHub Pages in one step.
 
 Rebuilds the pygbag web package, refreshes docs/ from the fresh output, then
-commits docs/ and pushes. GitHub Pages serves docs/ on the web-port branch, so
-the push redeploys https://bucksstop.github.io/NORAD/ within about a minute.
+commits docs/ and pushes. GitHub Pages serves docs/ on the main branch, so the
+push redeploys https://bucksstop.github.io/NORAD/ within about a minute.
 
 Usage:
     .\deploy_web.ps1                        # timestamped deploy commit
@@ -29,7 +29,10 @@ New-Item -ItemType Directory -Force $docs | Out-Null
 Copy-Item (Join-Path $root "websrc\build\web\*") $docs -Recurse -Force
 New-Item -ItemType File -Force (Join-Path $docs ".nojekyll") | Out-Null
 
-# 3. Commit docs/ and push; Pages redeploys automatically.
+# 3. Commit docs/ and push; Pages redeploys automatically. git writes normal
+#    progress to stderr, which PowerShell's Stop mode would treat as a fatal
+#    error, so relax error handling here and check exit codes explicitly.
+$ErrorActionPreference = "Continue"
 git add docs
 git diff --cached --quiet
 if ($LASTEXITCODE -eq 0) {
@@ -38,7 +41,9 @@ if ($LASTEXITCODE -eq 0) {
 }
 if ($Message -eq "") { $Message = "Deploy web build $(Get-Date -Format 'yyyy-MM-dd HH:mm')" }
 git commit -m $Message
+if ($LASTEXITCODE -ne 0) { Write-Host "git commit failed (exit $LASTEXITCODE)."; exit 1 }
 git push
+if ($LASTEXITCODE -ne 0) { Write-Host "git push failed (exit $LASTEXITCODE)."; exit 1 }
 
 Write-Host ""
 Write-Host "Deployed. https://bucksstop.github.io/NORAD/ updates within ~a minute."
