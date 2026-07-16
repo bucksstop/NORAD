@@ -1643,9 +1643,6 @@ class App:
             self.buttons.append((r, label, cb, enabled, bg))
             y += bh + 6 + gap
 
-        # Rulebook reference - always available, on every phase.
-        add("NORAD Rulebook (PDF)", self.open_rulebook, bg=TABS_BG, gap=4)
-
         if g.phase == "over":
             add("Reveal all units", self.toggle_reveal)
             add("Exit game", self.quit_app)
@@ -2303,7 +2300,9 @@ class App:
         for s0 in shortcut_src:
             hint_lines.extend(self.wrap(s0, PANEL_W - 32, self.small))
         hint_h = len(hint_lines) * 16 + 10
-        y = max(y + 6, min(SHORTCUTS_Y, h - hint_h - 60))
+        # reserve room below the shortcuts box for the rulebook button + a
+        # little log
+        y = max(y + 6, min(SHORTCUTS_Y, h - hint_h - 96))
         pygame.draw.rect(scr, TABS_BG,
                          pygame.Rect(8, y, PANEL_W - 16, hint_h),
                          border_radius=5)
@@ -2313,6 +2312,17 @@ class App:
                      (16, ty))
             ty += 16
         y += hint_h + 8
+
+        # ---- NORAD Rulebook link, just below the shortcuts box (added to
+        #      self.buttons so the normal button-click handler opens it)
+        rb = pygame.Rect(8, y, PANEL_W - 16, 30)
+        pygame.draw.rect(scr, TABS_BG, rb, border_radius=6)
+        rlab = self.small.render("NORAD Rulebook (PDF)", True, WHITE)
+        scr.blit(rlab, (rb.centerx - rlab.get_width() // 2,
+                        rb.centery - rlab.get_height() // 2))
+        self.buttons.append((rb, "NORAD Rulebook (PDF)",
+                             self.open_rulebook, True, TABS_BG))
+        y += 36
 
         # ---- log fills whatever space remains
         scr.blit(self.font.render("Log:", True, GREY), (14, y))
