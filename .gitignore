@@ -4,6 +4,9 @@ __pycache__/
 *.pyd
 .DS_Store
 
+# Microsoft Office temp/lock files (created while a doc is open)
+~$*
+
 .claude/settings.local.json
 
 backup/
