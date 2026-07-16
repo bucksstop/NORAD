@@ -572,6 +572,11 @@ class App:
                                 True, WHITE)
             scr.blit(t, (w // 2 - t.get_width() // 2, 40))
             rects = []
+            rule_rect = pygame.Rect(w - 232, 16, 214, 30)
+            pygame.draw.rect(scr, TABS_BG, rule_rect, border_radius=6)
+            rl = self.font.render("View NORAD Rulebook (PDF)", True, WHITE)
+            scr.blit(rl, (rule_rect.centerx - rl.get_width() // 2,
+                          rule_rect.centery - rl.get_height() // 2))
             y = 120
             # --- Game mode ---
             scr.blit(self.font.render("Game mode:", True, GREY),
@@ -667,6 +672,8 @@ class App:
                     pygame.quit()
                     sys.exit()
                 if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
+                    if rule_rect.collidepoint(e.pos):
+                        self.open_rulebook()
                     for kind, val, r in rects:
                         if r.collidepoint(e.pos):
                             if kind == "mode":
@@ -1636,6 +1643,9 @@ class App:
             self.buttons.append((r, label, cb, enabled, bg))
             y += bh + 6 + gap
 
+        # Rulebook reference - always available, on every phase.
+        add("NORAD Rulebook (PDF)", self.open_rulebook, bg=TABS_BG, gap=4)
+
         if g.phase == "over":
             add("Reveal all units", self.toggle_reveal)
             add("Exit game", self.quit_app)
@@ -1752,6 +1762,28 @@ class App:
     def quit_app(self):
         pygame.quit()
         sys.exit()
+
+    def open_rulebook(self):
+        """Show the rulebook PDF: a new browser tab in the web build, the OS
+        default PDF viewer on the desktop. The file ships next to the page
+        online (docs/) and in the project root for the desktop game."""
+        if self.web_window is not None:
+            try:
+                self.web_window.open("NORAD%20Rulebook.pdf", "_blank")
+            except Exception:
+                self.flash("Could not open the rulebook.", ERRRED)
+            return
+        path = os.path.join(ROOT, "NORAD Rulebook.pdf")
+        if not os.path.exists(path):
+            self.flash("Rulebook PDF not found.", ERRRED)
+            return
+        try:
+            os.startfile(path)                    # Windows default viewer
+        except AttributeError:                    # non-Windows fallback
+            import webbrowser
+            webbrowser.open("file://" + path)
+        except Exception:
+            self.flash("Could not open the rulebook.", ERRRED)
 
     # ------------------------------------------------------------- drawing
     def sprite(self, uid, size, rot, back, done=False):

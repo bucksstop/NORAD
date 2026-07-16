@@ -56,13 +56,21 @@ $total = [math]::Round(((Get-ChildItem $dst -Recurse -File | Measure-Object -Pro
 Write-Host "Staged $total MB."
 
 $template = Join-Path $root "web_template.tmpl"
+$buildweb = Join-Path $dst "build\web"
+$pdf      = Join-Path $root "NORAD Rulebook.pdf"
 $env:SDL_VIDEODRIVER = "dummy"   # keep pygbag's packaging step headless
 
+# Build first, then drop the rulebook PDF next to the page so the in-game
+# button (and deploy -> docs/) can reach it by URL. (In -Serve, pygbag rebuilds
+# when it serves, so the local preview may not include the PDF - the desktop
+# build and the deployed site both do.)
+Write-Host "Building ..."
+py -m pygbag --template $template --build (Join-Path $dst "main.py")
+if (Test-Path $pdf) { Copy-Item $pdf $buildweb -Force }
+
 if ($Serve) {
-    Write-Host "Building and serving at http://localhost:$Port ..."
+    Write-Host "Serving at http://localhost:$Port ..."
     py -m pygbag --template $template --port $Port (Join-Path $dst "main.py")
 } else {
-    Write-Host "Building (no server) ..."
-    py -m pygbag --template $template --build (Join-Path $dst "main.py")
-    Write-Host "Done. Output: $(Join-Path $dst 'build\web')"
+    Write-Host "Done. Output: $buildweb"
 }
